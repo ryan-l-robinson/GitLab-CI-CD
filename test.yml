@@ -1,0 +1,38 @@
+## Build an Oracle Linux 8 container, used by other tests below ##
+.ol8_lamp_build:
+  stage: test
+  image: oraclelinux:8
+  before_script:
+    - dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    - dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    - dnf -y module enable php:remi-8.0
+    - dnf install -y php php-gd php-pdo zip unzip git php-curl php-mbstring php-zip php-json php-xml php-simplexml php-mysqlnd php-pecl-apcu wget curl
+    - php -v
+    - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    - php composer-setup.php
+    - php -r "unlink('composer-setup.php');"
+    
+ ### PHP lint test ###
+.php_lint:
+  stage: test
+  extends: .ol8_lamp_build
+  variables:
+    DIRECTORIES: "./"
+    EXTENSIONS: "php"
+  script:
+    ## Recursively checks for files of specified extensions in specified directories and completes php lint on them
+    - cwd="$(pwd)"
+    - |
+      for DIRECTORY in $DIRECTORIES 
+        do
+          cd $DIRECTORY
+          for EXT in $EXTENSIONS
+            do
+              files="$(find -name *.${EXT} -type f)"
+
+              for file in ${files}
+                do php -l ${file};
+              done;
+            done;
+          cd $cwd;
+        done;
