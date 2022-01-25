@@ -1,0 +1,18 @@
+# Includes general CI jobs to extend from
+include:
+    - project: '[GitLab project with CI]'
+      ref: main
+      file: test.yml
+
+## Stages ##
+stages:
+  - test
+
+## Test Jobs ##
+
+### Tests for PHP errors in custom code of a Drupal 8+ site ###
+php:
+  extends: .php_lint
+  variables:
+    DIRECTORIES: ./web/themes/custom ./web/modules/custom
+    EXTENSIONS: php module theme inc
