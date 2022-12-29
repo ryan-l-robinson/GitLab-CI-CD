@@ -1,12 +1,16 @@
-# Includes general CI jobs to extend from
+# Includes general CI jobs to extend from, where the 
 include:
-    - project: '[GitLab project with CI]'
-      ref: main
-      file: test.yml
+  - project: '[GitLab project with CI]'
+    ref: main
+    file: test.yml
+  - project: '[GitLab project with CI]'
+    ref: main
+    file: deploy.yml
 
 ## Stages ##
 stages:
   - test
+  - deploy
 
 ## Test Jobs ##
 
@@ -16,3 +20,62 @@ php:
   variables:
     DIRECTORIES: ./web/themes/custom ./web/modules/custom
     EXTENSIONS: php module theme inc
+
+## Deploy Jobs ##
+
+### Deploys to dev server only when changes are made to the dev branch ###
+deploy_dev:
+  extends:
+    - .deploy_template
+  variables:
+    ENVIRONMENT_NAME: Development
+    SERVER_URL: [dev url]
+    WEB_ROOT: /opt/www/html
+  tags:
+    - [dev GitLab runner tag]
+  only:
+    refs:
+      - dev
+
+### Deploys to staging server only when changes are made to the main branch ###
+deploy_staging:
+  extends:
+    - .deploy_template
+  variables:
+    ENVIRONMENT_NAME: Development
+    SERVER_URL: [dev url]
+    WEB_ROOT: /opt/www/html
+  tags:
+    - [staging GitLab runner tag]
+  only:
+    refs:
+      - main
+
+### Deploys to production only when main branch and manually triggered ###
+deploy_prod1:
+  extends:
+    - .deploy_template
+  variables:
+    ENVIRONMENT_NAME: Production 1
+    SERVER_URL: [production 1 URL]
+    WEB_ROOT: /opt/www/html
+  tags:
+    - [prod 1 GitLab runner tag]
+  only:
+    refs:
+      - main
+  when: manual
+
+deploy_prod2:
+  extends:
+    - .deploy_template
+  variables:
+    ENVIRONMENT_NAME: Production 2
+    SERVER_URL: [production 2 URL]
+    WEB_ROOT: /opt/www/html
+  tags:
+    - [prod 2 GitLab runner tag]
+  only:
+    refs:
+      - main
+  when: manual

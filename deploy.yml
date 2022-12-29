@@ -1,0 +1,19 @@
+## Deploy Jobs ##
+variables:
+  ENVIRONMENT_NAME: "dev"
+  SERVER_URL: ""
+  WEB_ROOT: "/opt/www/html"
+
+### Generic deploy to specified server ###
+.deploy_template:
+  stage: deploy
+  environment:
+    name: $ENVIRONMENT_NAME
+    url: $SERVER_URL
+  script:
+    - echo "Deploying to server at $SERVER_URL"
+    - cd $WEB_ROOT
+    - git fetch
+    - git reset --hard
+    - git stash
+    - git pull
