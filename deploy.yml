@@ -27,6 +27,17 @@ variables:
   script:
     - cd $WEB_ROOT
     - vendor/drush/drush/drush state:set system.maintenance_mode 1 --input-format=integer
+    - composer install
+
+.drupal_composer_prod:
+  stage: deploy
+  environment:
+    name: $ENVIRONMENT_NAME
+    url: $SERVER_URL
+  script:
+    - cd $WEB_ROOT
+    - vendor/drush/drush/drush state:set system.maintenance_mode 1 --input-format=integer
+    - composer install --no-dev
 
 .drupal_config:
   stage: deploy
