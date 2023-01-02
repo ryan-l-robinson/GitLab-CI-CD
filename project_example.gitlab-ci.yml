@@ -25,14 +25,16 @@ php:
 
 ### Deploys to dev server only when changes are made to the dev branch ###
 deploy_dev:
-  extends:
+  extends: 
     - .deploy_template
+    - .drupal_composer
+    - .drupal_config
   variables:
     ENVIRONMENT_NAME: Development
-    SERVER_URL: [dev url]
+    SERVER_URL: dev.demo.com
     WEB_ROOT: /opt/www/html
   tags:
-    - [dev GitLab runner tag]
+    - dev
   only:
     refs:
       - dev
@@ -41,41 +43,72 @@ deploy_dev:
 deploy_staging:
   extends:
     - .deploy_template
+    - .drupal_composer
+    - .drupal_config
   variables:
-    ENVIRONMENT_NAME: Development
-    SERVER_URL: [dev url]
+    ENVIRONMENT_NAME: Staging
+    SERVER_URL: staging.demo.com
     WEB_ROOT: /opt/www/html
   tags:
-    - [staging GitLab runner tag]
+    - staging
   only:
     refs:
       - main
 
-### Deploys to production only when main branch and manually triggered ###
-deploy_prod1:
-  extends:
+### Deploys code to production only when main branch and manually triggered ###
+deploy_prod_1:
+  extends: 
     - .deploy_template
+    - .drupal_composer
+  variables:
+    ENVIRONMENT_NAME: Prod 1
+    SERVER_URL: prod1.demo.com
+    WEB_ROOT: /opt/www/html
+  tags:
+    - prod1
+  only:
+    refs:
+      - main  
+  when: manual
+
+deploy_prod_2:
+  extends: 
+    - .deploy_template
+    - .drupal_composer
+  variables:
+    ENVIRONMENT_NAME: Prod 2
+    SERVER_URL: prod2.demo.com
+    WEB_ROOT: /opt/www/html
+  tags:
+    - prod2
+  only:
+    refs:
+      - main  
+  when: manual
+
+#### Deploys config updates to production. These need to wait for both servers to have the composer updated code. ####
+drupal_install_prod1:
+  extends: .drupal_config
   variables:
     ENVIRONMENT_NAME: Production 1
-    SERVER_URL: [production 1 URL]
+    SERVER_URL: prod1.demo.com
     WEB_ROOT: /opt/www/html
   tags:
-    - [prod 1 GitLab runner tag]
+    - prod1
   only:
     refs:
       - main
-  when: manual
+  needs: [deploy_prod1, deploy_prod2]
 
-deploy_prod2:
-  extends:
-    - .deploy_template
+drupal_install_prod2:
+  extends: .drupal_cache
   variables:
     ENVIRONMENT_NAME: Production 2
-    SERVER_URL: [production 2 URL]
+    SERVER_URL: prod2.demo.com
     WEB_ROOT: /opt/www/html
   tags:
-    - [prod 2 GitLab runner tag]
+    - prod2
   only:
     refs:
       - main
-  when: manual
+  needs: [deploy_prod1, deploy_prod2, drupal_install_prod1]
