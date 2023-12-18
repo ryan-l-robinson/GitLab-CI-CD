@@ -42,6 +42,7 @@
 ## Parses from an XML sitemap that must be available publicly by curl, which for many sites will serve as the fastest way to look up all URLs. ##
 .parse_xml_sitemap:
   stage: test
+  # See an example of building the testing image at https://github.com/ryan-l-robinson/playwright-axe-Docker-GitLab. #
   image: [path to image]
   variables:
     SITEMAP_URL: ""
@@ -72,7 +73,8 @@
 ## Runs tests using pa11y ##
 .pa11y_test:
   stage: test
-  image: registry.gitlab.com/wlu-lib-dev/apps/pa11y-docker-gitlab/pa11y:main
+  # See example of building the testing image at https://github.com/ryan-l-robinson/pa11y-Docker-GitLab. #
+  image: [path to image]
   script:
     # Use pa11y-ci's built-in function for scanning from a sitemap. #
     - pa11y-ci --sitemap $SITEMAP_URL --config /opt/pa11y/config.json --reporter=json > results.json
