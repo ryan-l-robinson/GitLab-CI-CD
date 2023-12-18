@@ -36,3 +36,51 @@
             done;
           cd $cwd;
         done;
+
+# Accessibility tests #
+
+## Parses from an XML sitemap that must be available publicly by curl, which for many sites will serve as the fastest way to look up all URLs. ##
+.parse_xml_sitemap:
+  stage: test
+  image: [path to image]
+  variables:
+    SITEMAP_URL: ""
+  before_script:
+    - curl -s $SITEMAP_URL > sitemap.xml
+    - grep -o '<loc>[^<]*</loc>' ./sitemap.xml | sed 's/<loc>\|<\/loc>//g' > /opt/playwright/tests/urls.txt
+
+## Runs tests defined in Playwright scripts. ##
+.playwright_test:
+  stage: test
+  script:
+    # Copy any site-specific tests to run alongside the general test(s). #
+    - |
+      if [ -d "$CI_PROJECT_DIR/tests" ]; then
+        cp -r $CI_PROJECT_DIR/tests/* /opt/playwright/tests/
+      fi
+    # Move to directory and run Playwright tests. #
+    - cd /opt/playwright
+    - npx playwright test
+    # Copy results back to the build directory so they can be used as artifacts. #
+    - cp -r /opt/playwright/results $CI_PROJECT_DIR
+  artifacts:
+    when: always
+    paths:
+      - results/*
+    expire_in: 5 months
+
+## Runs tests using pa11y ##
+.pa11y_test:
+  stage: test
+  image: registry.gitlab.com/wlu-lib-dev/apps/pa11y-docker-gitlab/pa11y:main
+  script:
+    # Use pa11y-ci's built-in function for scanning from a sitemap. #
+    - pa11y-ci --sitemap $SITEMAP_URL --config /opt/pa11y/config.json --reporter=json > results.json
+  # Show as warning but don't stop execution of later jobs if failure. #
+  allow_failure: true
+  # Save the reports for 5 months. #
+  artifacts:
+    when: always
+    paths:
+      - results.json
+    expire_in: 5 months

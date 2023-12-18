@@ -1,4 +1,5 @@
 ## Deploy Jobs ##
+### Defines variables and declares defaults if the project implementing the job does not provide one ###
 variables:
   ENVIRONMENT_NAME: "dev"
   SERVER_URL: ""
@@ -13,12 +14,15 @@ variables:
   before_script:
     - echo "Deploying to server at $SERVER_URL"
     - cd $WEB_ROOT
+    # Clear out any changes that have been made on the target. #
     - git fetch
     - git reset --hard
     - git stash
     - git pull
 
 ### Drupal install jobs ###
+
+# Installs packages from composer and git submodules (dev version). #
 .drupal_composer:
   stage: deploy
   environment:
@@ -26,9 +30,14 @@ variables:
     url: $SERVER_URL
   script:
     - cd $WEB_ROOT
+    # Puts site into maintenance mode #
     - vendor/drush/drush/drush state:set system.maintenance_mode 1 --input-format=integer
+    # Installs composer packages as defined in the project's composer.lock, including dev packages. See below for production version. #
     - composer install
+    # Initialize any submodules newly added. #
+    - git submodule update --init
 
+# Installs packages from composer and git submodules (production version). #
 .drupal_composer_prod:
   stage: deploy
   environment:
@@ -36,9 +45,14 @@ variables:
     url: $SERVER_URL
   script:
     - cd $WEB_ROOT
+    # Puts site into maintenance mode #
     - vendor/drush/drush/drush state:set system.maintenance_mode 1 --input-format=integer
+    # Installs composer packages as defined in the project's composer.lock, without dev packages. See above for dev version. #
     - composer install --no-dev
+    # Initialize any submodules newly added. #
+    - git submodule update --init
 
+# Site-specific actions can be added to this, like environment indicator. #
 .drupal_config:
   stage: deploy
   environment:
@@ -46,14 +60,20 @@ variables:
     url: $SERVER_URL
   after_script:
     - cd $WEB_ROOT
+    # Puts site into maintenance mode #
     - vendor/drush/drush/drush state:set system.maintenance_mode 1 --input-format=integer
     - vendor/drush/drush/drush cr
+    # Import any changes to configuration. #
     - vendor/drush/drush/drush config-import -y
     - vendor/drush/drush/drush cr
+    # Updates database to reflect newly-updated packages. #
     - vendor/drush/drush/drush updb -y
+    # Takes site out of maintenance mode. #
     - vendor/drush/drush/drush state:set system.maintenance_mode 0 --input-format=integer
     - vendor/drush/drush/drush cr
 
+# Only clears cache. This is useful when you have two different web servers using one database server.  #
+# The database server only needs to be updated once (.drupal_config) but both servers need their caches cleared. #
 .drupal_cache:
   stage: deploy
   environment:
