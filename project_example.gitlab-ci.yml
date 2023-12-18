@@ -21,6 +21,47 @@ php:
     DIRECTORIES: ./web/themes/custom ./web/modules/custom
     EXTENSIONS: php module theme inc
 
+## Runs tests defined in Playwright scripts ##
+playwright_test:
+  stage: test
+  image: [registry address to image]
+  variables:
+    SITEMAP_URL: "https://example.com/sitemap.xml"
+  before_script:
+    # Parses from sitemap into list of URLs
+    - curl -s $SITEMAP_URL > sitemap.xml
+    - grep -o '<loc>[^<]*</loc>' ./sitemap.xml | sed 's/<loc>\|<\/loc>//g' > /opt/playwright/tests/urls.txt
+  script:
+    # Copy any site-specific tests to run alongside the general test(s)
+    - |
+      if [ -d "$CI_PROJECT_DIR/tests" ]; then
+        cp -r $CI_PROJECT_DIR/tests/* /opt/playwright/tests/
+      fi
+    # Move to directory to run Playwright tests
+    - cd /opt/playwright
+    - npx playwright test
+    # Copy results back to the build directory so they can be used as artifacts
+    - cp -r /opt/playwright/results $CI_PROJECT_DIR
+  artifacts:
+    when: always
+    paths:
+      - results/*
+    expire_in: 5 months
+
+## Runs tests using pa11y ##
+pa11y_test:
+  stage: test
+  image: [registry address to image]
+  script:
+    - pa11y-ci --sitemap $SITEMAP_URL --config /opt/pa11y/config.json --reporter=json > results.json
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - results.json
+    expire_in: 5 months
+
+
 ## Deploy Jobs ##
 
 ### Deploys to dev server only when changes are made to the dev branch ###
