@@ -25,7 +25,6 @@ php:
 playwright_test:
   stage: test
   extends:
-    - .parse_xml_sitemap
     - .playwright_test
   variables:
     # Where to find the sitemap. #

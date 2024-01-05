@@ -39,18 +39,8 @@
 
 # Accessibility tests #
 
-## Parses from an XML sitemap that must be available publicly by curl, which for many sites will serve as the fastest way to look up all URLs. ##
-.parse_xml_sitemap:
-  stage: test
-  # See an example of building the testing image at https://github.com/ryan-l-robinson/playwright-axe-Docker-GitLab. #
-  image: [path to image]
-  variables:
-    SITEMAP_URL: ""
-  before_script:
-    - curl -s $SITEMAP_URL > sitemap.xml
-    - grep -o '<loc>[^<]*</loc>' ./sitemap.xml | sed 's/<loc>\|<\/loc>//g' > /opt/playwright/tests/urls.txt
-
 ## Runs tests defined in Playwright scripts. ##
+## Note: some of these may take a long time, so check your job timeouts and/or split into multiple jobs. ##
 .playwright_test:
   stage: test
   script:
@@ -59,6 +49,8 @@
       if [ -d "$CI_PROJECT_DIR/tests" ]; then
         cp -r $CI_PROJECT_DIR/tests/* /opt/playwright/tests/
       fi
+    # Save the sitemap which is needed for the sitemap test. #
+    - curl -o /opt/playwright/sitemap.xml $SITEMAP_URL
     # Move to directory and run Playwright tests. #
     - cd /opt/playwright
     - npx playwright test
