@@ -24,8 +24,7 @@ php:
 ## Runs tests defined in Playwright scripts. ##
 playwright_test:
   stage: test
-  extends:
-    - .playwright_test
+  extends: .playwright_test
   variables:
     # Where to find the sitemap. #
     SITEMAP_URL: "https://example.com/sitemap.xml"
@@ -34,8 +33,7 @@ playwright_test:
 ## Runs tests using pa11y ##
 pa11y_test:
   stage: test
-  extends:
-    - .pa11y_test
+  extends: .pa11y_test
   variables:
     # Where to find the sitemap. #
     SITEMAP_URL: https://example.com/sitemap.xml
