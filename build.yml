@@ -1,0 +1,43 @@
+# Builds two Drupal containers: the web container and a db container updated via a script run on the web container. #
+# Stores them both in the GitLab repository. #
+# This job could be extended to provide different variables. #
+.build_drupal_db:
+  stage: build
+  # Update this image version number occasionally. #
+  image: docker:25.0.4-dind-alpine3.19
+  variables:
+    # Include copying git submodules. #
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_FORCE_HTTPS: "true"
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_UPDATE_FLAGS: --init
+    DB_DOCKERFILE_PATH: ./.devcontainer/db.Dockerfile
+    # This needs to match the hostname for the db image in the Drupal settings file. #
+    DB_HOSTNAME: db
+    DB_SCRIPT_PATH: /opt/drupal/scripts/newDB.sh
+    DB_TAG: $CI_REGISTRY_IMAGE/db:$CI_COMMIT_REF_SLUG
+    WEB_DOCKERFILE_PATH: ./.devcontainer/web.Dockerfile
+    WEB_HOSTNAME: web
+    WEB_TAG: $CI_REGISTRY_IMAGE/web:$CI_COMMIT_REF_SLUG
+  services:
+    # Update this image version number occasionally, matching the one above. #
+    - docker:25.0.4-dind-alpine3.19
+  script:
+    # Add git, which is required for some of the functions to work. #
+    - apk add git
+    # Login to the GitLab registry using the private unique password provided by GitLab. #
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    # Create the network of web and db. #
+    - docker network create --driver="bridge" drupal
+    # Build and run the containers in the network. #
+    - docker build -t db_temp -f $DB_DOCKERFILE_PATH .
+    - docker run -d --net drupal --name db -h $DB_HOSTNAME db_temp
+    - docker build -t $WEB_TAG -f $WEB_DOCKERFILE_PATH .
+    - docker run -d --net drupal --name web -h $WEB_HOSTNAME $WEB_TAG
+    # Run the script to update the db. #
+    - docker exec --user www-data:www-data web $DB_SCRIPT_PATH
+    # Save the updated db image. #
+    - docker commit $(docker ps -q --filter "name=db") $DB_TAG
+    # Push both containers to the registry. #
+    - docker push $WEB_TAG
+    - docker push $DB_TAG

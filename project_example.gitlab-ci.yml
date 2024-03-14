@@ -5,38 +5,34 @@ include:
     file: test.yml
   - project: '[GitLab project with CI]'
     ref: main
+    file: build.yml
+  - project: '[GitLab project with CI]'
+    ref: main
     file: deploy.yml
 
 ## Stages ##
 stages:
   - test
   - deploy
+  - build
+  - content_test
 
 ## Test Jobs ##
 
 ### Tests for PHP errors in custom code of a Drupal 8+ site ###
-php:
+php_lint:
   extends: .php_lint
   variables:
     DIRECTORIES: ./web/themes/custom ./web/modules/custom
     EXTENSIONS: php module theme inc
-
-## Runs tests defined in Playwright scripts. ##
-playwright_test:
-  stage: test
-  extends: .playwright_test
-  variables:
-    # Where to find the sitemap. #
-    SITEMAP_URL: "https://example.com/sitemap.xml"
-
-
-## Runs tests using pa11y ##
-pa11y_test:
-  stage: test
-  extends: .pa11y_test
-  variables:
-    # Where to find the sitemap. #
-    SITEMAP_URL: https://example.com/sitemap.xml
+  # Only run on dev or staging when custom code has changed. ##
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "staging"'
+    - changes:
+        - web/modules/custom/**/*
+        - web/themes/custom/**/*
 
 ## Deploy Jobs ##
 
@@ -129,3 +125,94 @@ drupal_install_prod2:
     refs:
       - main
   needs: [deploy_prod1, deploy_prod2, drupal_install_prod1]
+
+## Build Jobs ##
+
+### Updates web and db images for this branch ###
+build_drupal:
+  extends:
+    - .build_drupal_db
+  variables:
+    DB_DOCKERFILE_PATH: ./.devcontainer/db.Dockerfile
+    DB_HOSTNAME: "db"
+    DB_SCRIPT_PATH: /opt/drupal/scripts/newDB.sh
+    WEB_DOCKERFILE_PATH: ./.devcontainer/web.Dockerfile
+    WEB_HOSTNAME: "web"
+  rules:
+    # Run on dev, staging, main, or if certain files have changed. #
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: "$CI_COMMIT_BRANCH =~ /^(dev|staging|main)$/"
+    - changes:
+        - .devcontainer/*
+        - .devcontainer/**/*
+        - scripts/*
+        - .gitlab-ci.yml
+        - composer.lock
+        - web/modules/custom/**/*
+        - web/themes/custom/**/*
+
+## Content Test Jobs, which happen AFTER build and deploy to test for any problems in content. ##
+
+### Runs unit tests and provides coverage reports ###
+unit_tests:
+  extends: .phpunit_unit
+  stage: content_test
+  variables:
+    PHP_UNIT: /opt/drupal/vendor/bin/phpunit
+  needs: [build_drupal]
+  # Only run for changes to files with code to test, or merge to dev or staging. #
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "staging"'
+    - changes:
+        - composer.lock
+        - web/modules/custom/**/*
+        - web/themes/custom/**/*
+
+### Runs kernel tests ###
+
+kernel_tests_address:
+  extends: .phpunit_kernel
+  stage: content_test
+  variables:
+    PHP_UNIT: /opt/drupal/vendor/bin/phpunit
+    GROUP: address
+    DB_HOSTNAME: "db"
+    WEB_HOSTNAME: "web"
+  needs: [build_drupal]
+  # As a contrib module, only run when composer.lock has updated, or dev/staging. #
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "staging"'
+    - changes:
+        - composer.lock
+
+## Runs tests defined in Playwright scripts. ##
+playwright_test:
+  stage: content_test
+  extends: .playwright_test
+  variables:
+    # Where to find the sitemap. #
+    SITEMAP_URL: "https://example.com/sitemap.xml"
+  # Only run on staging and main. #
+  only:
+    refs:
+      - staging
+      - main
+
+## Runs tests using pa11y ##
+pa11y_test:
+  stage: content_test
+  extends: .pa11y_test
+  variables:
+    # Where to find the sitemap. #
+    SITEMAP_URL: https://example.com/sitemap.xml
+  # Only run on staging and main. #
+  only:
+    refs:
+      - staging
+      - main
+
